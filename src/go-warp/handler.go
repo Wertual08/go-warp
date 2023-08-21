@@ -7,8 +7,7 @@ import (
 
 type HandlerManager interface {
     Fail(index int, err error)
-    FailDelay(index int, err error, retryDelay time.Duration)
-    Metadata(index int) map[string]string
+    FailAt(index int, err error, scheduledAt time.Time)
 }
 
 type Handler[T Objective] interface {

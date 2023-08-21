@@ -15,5 +15,4 @@ type ObjectiveDto struct {
     FailCount   int32
     FailReason  string
 	Content     []byte
-	Metadata    string
 }
