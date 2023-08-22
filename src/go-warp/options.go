@@ -11,8 +11,8 @@ type InstanceOptions struct {
 type QueueOptions struct {
     Name string
     Enabled bool
-    ChannelsCount int32
-    ChannelsOffset int32
+    SectionsCount int32
+    SectionsOffset int32
     BatchSize int32
     MaxFails int32
     BatchDelay time.Duration

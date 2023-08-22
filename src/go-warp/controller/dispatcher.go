@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/wertual08/go-warp"
 	"github.com/wertual08/go-warp/storage"
 )
 
@@ -17,23 +16,24 @@ type Dispatcher struct {
     id uuid.UUID
     dispatcherRepository storage.DispatcherRepository
 
-    Stride int32
-    Offset int32
+    stride int32
+    offset int32
 
     queuesWaitGroup sync.WaitGroup
     queuesRunning atomic.Int32
-	queues []Queue
+    queuesCallback func (*atomic.Int32, *sync.WaitGroup, int32, int32)
 }
 
 func CreateDispatcher(
-    options *warp.InstanceOptions,
     dispatcherRepository storage.DispatcherRepository,
+    queuesCallback func (*atomic.Int32, *sync.WaitGroup, int32, int32),
 ) Dispatcher {
     return Dispatcher{
         id: uuid.New(),
         dispatcherRepository: dispatcherRepository,
-        Stride: -1,
-        Offset: -1,
+        stride: -1,
+        offset: -1,
+        queuesCallback: queuesCallback,
     }
 }
 
@@ -46,13 +46,15 @@ func (inst *Dispatcher) Process(
         return err
     }
 
-    if requiredStride != inst.Stride || requiredOffset != inst.Offset {
-        // TODO: Maybe i should update lifetime while waiting...
-        inst.queuesRunning.Store(0)
-        inst.queuesWaitGroup.Wait()
+    if requiredStride != inst.stride || requiredOffset != inst.offset {
+        if inst.queuesRunning.Load() != 0 {
+            // TODO: Maybe i should update lifetime while waiting...
+            inst.queuesRunning.Store(0)
+            inst.queuesWaitGroup.Wait()
+        }
 
-        inst.Stride = requiredStride
-        inst.Offset = requiredOffset
+        inst.stride = requiredStride
+        inst.offset = requiredOffset
     }
 
     if err := inst.upsert(lifetime, ctx); err != nil {
@@ -66,13 +68,23 @@ func (inst *Dispatcher) Process(
 
     if allValid && inst.queuesRunning.Load() == 0 {
         inst.queuesRunning.Store(1)
-        inst.runQueues()
+        inst.queuesCallback(
+            &inst.queuesRunning,
+            &inst.queuesWaitGroup,
+            inst.stride,
+            inst.offset,
+        )
     }
 
     return nil
 }
 
 func (inst *Dispatcher) Finish(ctx context.Context) error {
+    if inst.queuesRunning.Load() != 0 {
+        inst.queuesRunning.Store(0)
+        inst.queuesWaitGroup.Wait()
+    }
+
     return inst.dispatcherRepository.Remove(inst.id, ctx)
 }
 
@@ -100,8 +112,8 @@ func (inst *Dispatcher) upsert(
 ) error {
     dto := storage.DispatcherDto{
         Id: inst.id,
-        Stride: inst.Stride,
-        Offset: inst.Offset,
+        Stride: inst.stride,
+        Offset: inst.offset,
     }
 
     return inst.dispatcherRepository.Create(dto, lifetime, ctx)
@@ -139,21 +151,4 @@ func (inst *Dispatcher) checkValid(ctx context.Context) (bool, error) {
     }
     
     return allValid && found, nil
-}
-
-func (inst *Dispatcher) runQueues() {
-    inst.queuesWaitGroup.Add(len(inst.queues))
-
-    for _ = range inst.queues {
-        go func() {
-            defer inst.queuesWaitGroup.Done()
-
-            for inst.queuesRunning.Load() != 0 {
-                //if err := inst.handle(&inst.queues[i], inst.ctx); err != nil {
-                //    // TODO: Log error
-                //    time.Sleep(inst.options.FailDelay)
-                //}
-            }
-        }()
-    }
 }

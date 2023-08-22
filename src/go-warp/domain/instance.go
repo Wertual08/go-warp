@@ -12,10 +12,30 @@ import (
 )
 
 type Instance struct {
-    ctx context.Context
     options *warp.InstanceOptions
     repositoryFactory warp.RepositoryFactory
     dispatcher controller.Dispatcher
+	queues []controller.Queue
+    ctx context.Context
+}
+
+func NewInstance(
+    options *warp.InstanceOptions,
+    repositoryFactory warp.RepositoryFactory,
+    ctx context.Context,
+) *Instance {
+    inst := &Instance {
+        options: options,
+        repositoryFactory: repositoryFactory,
+        ctx: ctx,
+    };
+
+    inst.dispatcher = controller.CreateDispatcher(
+        repositoryFactory.Dispatcher,
+        inst.runQueues,
+    )
+
+    return inst
 }
 
 func Register[T warp.Objective](
@@ -30,7 +50,6 @@ func Register[T warp.Objective](
     if err != nil {
         return nil, err
     }
-
 
     queueController := controller.CreateQueue[T](
         queueId,
@@ -72,61 +91,31 @@ func (inst *Instance) Run() {
     inst.dispatcher.Finish(inst.ctx)
 }
 
-func (inst *Instance) handle(
-    queue *controller.Queue,
-    ctx context.Context,
-) error {
-    if !queue.Options.Enabled {
-        time.Sleep(queue.Options.BatchDelay)
-        return nil
-    }
+func (inst *Instance) runQueues(
+    running *atomic.Int32, 
+    wg *sync.WaitGroup,
+    stride int32,
+    offset int32,
+) {
+    wg.Add(len(inst.queues))
 
-    now := time.Now()
-
-    for i, channel := range queue.Channels {
-        for channel >= int32(len(queue.DispatcherOffsets)) {
-            queue.DispatcherOffsets = append(queue.DispatcherOffsets, -1)
-        }
-
-        queue.DispatcherOffsets[channel] = i
-
-        if i >= len(queue.Dispatchers) {
-            queue.Dispatchers = append(queue.Dispatchers, queue.DispatcherFactory())
-        }
-    }
-
-    objectives, err := inst.repositoryFactory.Objective.List(
-        queue.Id,
-        queue.Channels,
-        queue.Options.BatchSize,
-        now,
-        ctx,
-    )
-    if err != nil {
-        return err
-    }
-
-    for index := range objectives {
-        objective := &objectives[index]
-        dispatcher := queue.DispatcherOffsets[objective.Channel]
-
-        if err := queue.Dispatchers[dispatcher].Push(objective); err != nil {
-            return err
-        }
-    }
-
-    batchDelay := false
-
-    wg := sync.WaitGroup{}
-    for _, channel := range queue.Channels {
-        wg.Add(1)
+    for i := range inst.queues {
         go func() {
             defer wg.Done()
 
-            queue.Dispatchers[channel].Handle(ctx)
+            for running.Load() != 0 {
+                err := inst.queues[i].Handle(
+                    stride,
+                    offset,
+                    inst.repositoryFactory.Objective,
+                    inst.ctx,
+                )
+
+                if err != nil {
+                    // TODO: Log error
+                    time.Sleep(inst.options.FailDelay)
+                }
+            }
         }()
     }
-    wg.Done()
-    
-    return nil
 }

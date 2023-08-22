@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"time"
 
 	"github.com/wertual08/go-warp"
 	"github.com/wertual08/go-warp/storage"
@@ -42,13 +41,13 @@ func (inst *handlerImpl[T]) Handle(
 
     if err != nil {
         reason := err.Error()
-        inst.FailedObjectives = inst.FailedObjectives[:0]
+        inst.manager.FailedObjectives = inst.manager.FailedObjectives[:0]
 
         for _, objective := range objectives {
             objective.FailCount += 1
             objective.FailReason = reason
 
-            inst.FailedObjectives = append(inst.FailedObjectives, objective)
+            inst.manager.FailedObjectives = append(inst.manager.FailedObjectives, objective)
         }
     }
 
@@ -56,11 +55,7 @@ func (inst *handlerImpl[T]) Handle(
 }
 
 func (inst *handlerImpl[T]) Succeded() int {
-    return len(inst.objectives) - len(inst.FailedObjectives)
-}
-
-func (inst *handlerImpl[T]) Failed() []storage.ObjectiveDto {
-    return inst.FailedObjectives
+    return len(inst.objectives) - len(inst.manager.FailedObjectives)
 }
 
 

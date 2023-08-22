@@ -29,7 +29,7 @@ func (inst *planner[T]) PlanBatch(objectives []T, ctx context.Context) error {
     for index, objective := range objectives {
         dto := &dtos[index]
         dto.QueueId = inst.QueueId
-        dto.Channel = objective.HashCode() % inst.Options.ChannelsCount
+        dto.Section = objective.HashCode() % inst.Options.SectionsCount
         dto.ScheduledAt = now
         dto.CreatedAt = now 
         dto.Content = objective.Serialize()

@@ -8,7 +8,7 @@ import (
 
 type ObjectiveDto struct {
 	QueueId     int32
-	Channel     int32
+	Section     int32
 	Id          uuid.UUID
 	ScheduledAt time.Time
 	CreatedAt   time.Time
