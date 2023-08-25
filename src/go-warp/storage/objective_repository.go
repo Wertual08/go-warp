@@ -10,9 +10,9 @@ type ObjectiveRepository interface {
     Remove(dtos []ObjectiveDto, ctx context.Context) error
     List(
         queueId int32, 
-        channels int32, 
-        limit int32,
-        now time.Time,
-        ctx context.Context,
+        channel int32, 
+        limit   int32,
+        now     time.Time,
+        ctx     context.Context,
     ) ([]ObjectiveDto, error)
 }

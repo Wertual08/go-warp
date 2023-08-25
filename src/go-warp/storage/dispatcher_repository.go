@@ -9,7 +9,7 @@ import (
 
 type DispatcherRepository interface {
     Create(
-        dtos DispatcherDto, 
+        dto DispatcherDto, 
         ttl time.Duration,
         ctx context.Context,
     ) error

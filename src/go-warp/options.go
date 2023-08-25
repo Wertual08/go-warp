@@ -4,7 +4,8 @@ import "time"
 
 type InstanceOptions struct {
 	Enabled bool
-    HeartbeatPeriod time.Duration
+    ActiveHeartbeatPeriod time.Duration
+    IdleHeartbeatPeriod time.Duration
     FailDelay time.Duration
 }
 

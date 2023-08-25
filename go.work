@@ -2,6 +2,7 @@ go 1.21.0
 
 use (
 	./src/go-warp
+	./src/go-warp-memory
 	./src/go-warp-playground
 	./src/go-warp-scylla
 )
