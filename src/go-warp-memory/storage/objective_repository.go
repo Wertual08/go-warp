@@ -12,7 +12,7 @@ import (
 type ObjectiveRepository struct {
     mtx sync.RWMutex
     // TODO: Replace with priority queue mb...
-    objectives map[int32][][]storage.ObjectiveDto
+    Objectives map[int32][][]storage.ObjectiveDto
 }
 
 func (inst *ObjectiveRepository) Create(
@@ -25,7 +25,7 @@ func (inst *ObjectiveRepository) Create(
     for _, objective := range dtos {
         var sections [][]storage.ObjectiveDto
 
-        if currentSections, ok := inst.objectives[objective.QueueId]; ok {
+        if currentSections, ok := inst.Objectives[objective.QueueId]; ok {
             appended := false
             for len(currentSections) <= int(objective.Section) {
                 appended = true
@@ -33,13 +33,13 @@ func (inst *ObjectiveRepository) Create(
             }
 
             if appended {
-                inst.objectives[objective.QueueId] = currentSections 
+                inst.Objectives[objective.QueueId] = currentSections 
             }
 
             sections = currentSections
         } else {
             sections = make([][]storage.ObjectiveDto, objective.Section + 1)
-            inst.objectives[objective.QueueId] = sections
+            inst.Objectives[objective.QueueId] = sections
         }
         
         objective.Id = uuid.New()
@@ -57,7 +57,7 @@ func (inst *ObjectiveRepository) Remove(
     defer inst.mtx.Unlock()
 
     for _, objective := range dtos {
-        sections := inst.objectives[objective.QueueId]
+        sections := inst.Objectives[objective.QueueId]
         section := sections[objective.Section]
 
         for i, currentObjective := range section {
@@ -84,7 +84,7 @@ func (inst *ObjectiveRepository) List(
 
     result := make([]storage.ObjectiveDto, 0, limit)
 
-    if sections, ok := inst.objectives[queueId]; ok {
+    if sections, ok := inst.Objectives[queueId]; ok {
         if int(channel) < len(sections) {
             for _, objective := range sections[channel] {
                 if len(result) >= int(limit) {

@@ -11,7 +11,7 @@ import (
 
 type DispatcherRepository struct {
     mtx         sync.Mutex
-    dispatchers []dispatcherEntry
+    Dispatchers []dispatcherEntry
 }
 
 type dispatcherEntry struct {
@@ -19,7 +19,7 @@ type dispatcherEntry struct {
     dispatcher storage.DispatcherDto
 }
 
-func (inst *DispatcherRepository) Create(
+func (inst *DispatcherRepository) Upsert(
     dto storage.DispatcherDto, 
     ttl time.Duration,
     ctx context.Context,
@@ -31,8 +31,20 @@ func (inst *DispatcherRepository) Create(
 
     inst.mtx.Lock()
     defer inst.mtx.Unlock()
+    
+    found := false
 
-    inst.dispatchers = append(inst.dispatchers, entry)
+    for i, dispatcher := range inst.Dispatchers {
+        if dispatcher.dispatcher.Id == dto.Id {
+            inst.Dispatchers[i] = entry
+            found = true
+            break;
+        }
+    }
+
+    if !found {
+        inst.Dispatchers = append(inst.Dispatchers, entry)
+    }
 
     return nil
 }
@@ -41,10 +53,10 @@ func (inst *DispatcherRepository) Remove(id uuid.UUID, ctx context.Context) erro
     inst.mtx.Lock()
     defer inst.mtx.Unlock()
 
-    for i, entry := range inst.dispatchers {
+    for i, entry := range inst.Dispatchers {
         if entry.dispatcher.Id == id {
-            inst.dispatchers[i] = inst.dispatchers[len(inst.dispatchers) - 1]
-            inst.dispatchers = inst.dispatchers[:len(inst.dispatchers) - 1]
+            inst.Dispatchers[i] = inst.Dispatchers[len(inst.Dispatchers) - 1]
+            inst.Dispatchers = inst.Dispatchers[:len(inst.Dispatchers) - 1]
         }
     }
 
@@ -55,9 +67,9 @@ func (inst *DispatcherRepository) List(ctx context.Context) ([]storage.Dispatche
     inst.mtx.Lock()
     defer inst.mtx.Unlock()
     
-    result := make([]storage.DispatcherDto, len(inst.dispatchers))
+    result := make([]storage.DispatcherDto, len(inst.Dispatchers))
 
-    for i, entry := range inst.dispatchers {
+    for i, entry := range inst.Dispatchers {
         result[i] = entry.dispatcher
     }
 

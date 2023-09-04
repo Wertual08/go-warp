@@ -10,11 +10,11 @@ type InstanceOptions struct {
 }
 
 type QueueOptions struct {
-    Name string
-    Enabled bool
-    SectionsCount int32
+    Name           string
+    Enabled        bool
+    SectionsCount  int32
     SectionsOffset int32
-    BatchSize int32
-    MaxFails int32
-    BatchDelay time.Duration
+    BatchSize      int32
+    BatchDelay     time.Duration
+    MaxFails       int32
 }

@@ -24,7 +24,7 @@ type Dispatcher struct {
     queuesCallback func (*atomic.Int32, *sync.WaitGroup, int32, int32)
 }
 
-func CreateDispatcher(
+func NewDispatcher(
     dispatcherRepository storage.DispatcherRepository,
     queuesCallback func (*atomic.Int32, *sync.WaitGroup, int32, int32),
 ) Dispatcher {
@@ -41,12 +41,15 @@ func (inst *Dispatcher) Process(
     lifetime time.Duration,
     ctx context.Context,
 ) error {
+    // TODO: Unsubscribe if disabled
+
     requiredStride, requiredOffset, err := inst.findRequred(ctx)
     if err != nil {
         return err
     }
 
     if requiredStride != inst.stride || requiredOffset != inst.offset {
+    
         if inst.queuesRunning.Load() != 0 {
             // TODO: Maybe i should update lifetime while waiting...
             inst.queuesRunning.Store(0)
@@ -116,9 +119,10 @@ func (inst *Dispatcher) upsert(
         Offset: inst.offset,
     }
 
-    return inst.dispatcherRepository.Create(dto, lifetime, ctx)
+    return inst.dispatcherRepository.Upsert(dto, lifetime, ctx)
 }
 
+// TODO: Unite in one step with findRequired
 func (inst *Dispatcher) checkValid(ctx context.Context) (bool, error) {
     dispatchers, err := inst.dispatcherRepository.List(ctx)
     if err != nil {

@@ -10,52 +10,52 @@ import (
 )
 
 type Queue struct {
-    Id int32
-    Options *warp.QueueOptions
-    HandlerFactory func() Handler
-    Handlers []Handler
+    id             int32
+    options        *warp.QueueOptions
+    handlerFactory func() Handler
+    handlers       []Handler
 }
 
-func CreateQueue[T warp.Objective](
-    queueId int32,
-    options *warp.QueueOptions,
-    handler warp.Handler[T],
+func NewQueue(
+    queueId               int32,
+    options               *warp.QueueOptions,
+    handlerFactory func() Handler,
 ) Queue {
     return Queue{
-        Id: queueId,
-        Options: options,
-        HandlerFactory: createHandlerFactory(handler),
+        id: queueId,
+        options: options,
+        handlerFactory: handlerFactory,
     }
 }
 
 func (inst *Queue) Handle(
-    stride int32,
-    offset int32,
+    stride              int32,
+    offset              int32,
     objectiveRepository storage.ObjectiveRepository,
-    ctx context.Context,
+    ctx                 context.Context,
 ) error {
-    if !inst.Options.Enabled {
-        time.Sleep(inst.Options.BatchDelay)
+    if !inst.options.Enabled {
+        time.Sleep(inst.options.BatchDelay)
         return nil
     }
 
     now := time.Now()
-    sectionsCount := (inst.Options.SectionsCount + inst.Options.SectionsOffset + stride - 1 - offset) / stride
+    sectionsCount := (inst.options.SectionsCount + inst.options.SectionsOffset + stride - 1 - offset) / stride
 
     result := make(chan error)
     skipDelay := false
 
     for i := int32(0); i < sectionsCount; i += 1 {
-        if int(i) == len(inst.Handlers) {
-            inst.Handlers = append(inst.Handlers, inst.HandlerFactory())
+        if int(i) == len(inst.handlers) {
+            inst.handlers = append(inst.handlers, inst.handlerFactory())
         }
         
         go handleSection(
             result, 
-            inst.Handlers[i], 
-            inst.Id,
+            inst.handlers[i], 
+            inst.id,
             offset + stride * i, 
-            inst.Options.BatchSize,
+            inst.options.BatchSize,
             now,
             &skipDelay,
             objectiveRepository,
@@ -71,20 +71,20 @@ func (inst *Queue) Handle(
     }
 
     if resultError == nil && !skipDelay {
-        time.Sleep(inst.Options.BatchDelay)
+        time.Sleep(inst.options.BatchDelay)
     }
 
     return resultError
 }
 
 func handleSection(
-    result chan error, 
-    handler Handler,
-    queueId int32,
-    section int32,
-    limit int32,
-    now time.Time,
-    skipDelay *bool,
+    result              chan error, 
+    handler             Handler,
+    queueId             int32,
+    section             int32,
+    limit               int32,
+    now                 time.Time,
+    skipDelay           *bool,
     objectiveRepository storage.ObjectiveRepository,
     ctx context.Context,
 ) {
@@ -99,7 +99,7 @@ func handleSection(
         result <- err
         return
     }
-
+    
     handler.Handle(objectives, ctx)
 
     if handler.Succeded() == int(limit) {

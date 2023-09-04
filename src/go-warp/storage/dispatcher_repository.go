@@ -8,7 +8,7 @@ import (
 )
 
 type DispatcherRepository interface {
-    Create(
+    Upsert(
         dto DispatcherDto, 
         ttl time.Duration,
         ctx context.Context,

@@ -1,4 +1,4 @@
-package domain
+package implementation
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/wertual08/go-warp"
 	"github.com/wertual08/go-warp/controller"
-	"github.com/wertual08/go-warp/implementation"
 )
 
 type Instance struct {
@@ -30,7 +29,7 @@ func NewInstance(
         ctx: ctx,
     };
 
-    inst.dispatcher = controller.CreateDispatcher(
+    inst.dispatcher = controller.NewDispatcher(
         repositoryFactory.Dispatcher,
         inst.runQueues,
     )
@@ -38,10 +37,10 @@ func NewInstance(
     return inst
 }
 
-func Register[T warp.Objective](
-    instance *Instance,
-    options *warp.QueueOptions,
-    handler warp.Handler[T],
+func Register[T warp.Objective[T]](
+    instance    *Instance,
+    options     *warp.QueueOptions,
+    handler     warp.Handler[T],
 ) (warp.Planner[T], error) {
     queueId, err := instance.repositoryFactory.Queue.FindOrCreate(
         options.Name, 
@@ -51,15 +50,15 @@ func Register[T warp.Objective](
         return nil, err
     }
 
-    queueController := controller.CreateQueue[T](
+    queueController := controller.NewQueue(
         queueId,
         options,
-        handler,
+        controller.NewHandlerFactory[T](handler),
     )
 
     instance.queues = append(instance.queues, queueController)
 
-    planner := implementation.CreatePlanner[T](
+    planner := NewPlanner[T](
         queueId,
         options,
         instance.repositoryFactory.Objective,
@@ -77,14 +76,15 @@ func (inst *Instance) Run() {
             continue
         default:
         }
-
-        err := inst.dispatcher.Process(inst.options.HeartbeatPeriod, inst.ctx)
+        
+        err := inst.dispatcher.Process(inst.options.IdleHeartbeatPeriod, inst.ctx)
 
         if err != nil {
             // TODO: Log error
             time.Sleep(inst.options.FailDelay)
         } else {
-            time.Sleep(inst.options.HeartbeatPeriod / 2)
+            // TODO: Calculate period from idle and active
+            time.Sleep(inst.options.IdleHeartbeatPeriod / 2)
         }
     }
 

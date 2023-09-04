@@ -8,10 +8,10 @@ import (
 	"github.com/wertual08/go-warp/storage"
 )
 
-type planner[T warp.Objective] struct {
-    QueueId int32
-    Options *warp.QueueOptions
-    ObjectiveRepository storage.ObjectiveRepository
+type planner[T warp.Objective[T]] struct {
+    queueId             int32
+    options             *warp.QueueOptions
+    objectiveRepository storage.ObjectiveRepository
 }
 
 func (inst *planner[T]) Plan(objective T, ctx context.Context) error {
@@ -28,24 +28,30 @@ func (inst *planner[T]) PlanBatch(objectives []T, ctx context.Context) error {
 
     for index, objective := range objectives {
         dto := &dtos[index]
-        dto.QueueId = inst.QueueId
-        dto.Section = objective.HashCode() % inst.Options.SectionsCount
+
+        serialized, err := objective.Serialize()
+        if err != nil {
+            return err
+        }
+
+        dto.QueueId = inst.queueId
+        dto.Section = (objective.HashCode() & 0x7fffffff) % inst.options.SectionsCount
         dto.ScheduledAt = now
         dto.CreatedAt = now 
-        dto.Content = objective.Serialize()
+        dto.Content = serialized
     }
 
-    return inst.ObjectiveRepository.Create(dtos, ctx)
+    return inst.objectiveRepository.Create(dtos, ctx)
 }
 
-func CreatePlanner[T warp.Objective](
-    queueId int32,
-    options *warp.QueueOptions,
+func NewPlanner[T warp.Objective[T]](
+    queueId             int32,
+    options             *warp.QueueOptions,
     objectiveRepository storage.ObjectiveRepository,
 ) warp.Planner[T] {
     return &planner[T]{
-        QueueId: queueId,
-        Options: options,
-        ObjectiveRepository: objectiveRepository,
+        queueId: queueId,
+        options: options,
+        objectiveRepository: objectiveRepository,
     }
 }
