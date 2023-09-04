@@ -11,7 +11,6 @@ type InstanceOptions struct {
 
 type QueueOptions struct {
     Name           string
-    Enabled        bool
     SectionsCount  int32
     SectionsOffset int32
     BatchSize      int32

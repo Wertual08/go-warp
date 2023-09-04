@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/wertual08/go-warp"
-	"github.com/wertual08/go-warp/implementation"
-	warpMemory "github.com/wertual08/go-warp/memory"
+	"github.com/wertual08/go-warp/memory"
 )
 
 type Objective struct {
@@ -36,12 +35,11 @@ func main() {
     instanceOptions := &warp.InstanceOptions{
         Enabled: true,
         ActiveHeartbeatPeriod: time.Second,
-        IdleHeartbeatPeriod: time.Second,
+        IdleHeartbeatPeriod: time.Minute,
         FailDelay: 4 * time.Second,
     }
     queueOptions := &warp.QueueOptions{
         Name: "fucker",
-        Enabled: true,
         SectionsCount: 16,
         SectionsOffset: 1,
         BatchSize: 64,
@@ -52,10 +50,13 @@ func main() {
 
 	instance := warpMemory.NewInstance(
         instanceOptions,
+        func (err error) {
+            fmt.Printf("Error: %s", err)
+        },
         ctx,
     )
 
-    planner, err := implementation.Register[Objective](
+    planner, err := warp.Register[Objective](
         instance,
         queueOptions,
         func (
@@ -70,7 +71,7 @@ func main() {
         },
     )
     if err != nil {
-        fmt.Printf("Planner failed %s\n", err)
+        fmt.Printf("Registeration failed: %s\n", err)
         return
     }
 
@@ -84,7 +85,10 @@ func main() {
                 Id: int64(i), 
                 Name: "FUCK YOU",
             }
-            planner.Plan(objective, ctx)
+            if err := planner.Plan(objective, ctx); err != nil {
+                fmt.Printf("Planning failed: %s", err);
+                return
+            }
         }
     }()
 

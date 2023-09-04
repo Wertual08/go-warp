@@ -1,44 +1,38 @@
-package controller
+package warp
 
 import (
 	"context"
 	"errors"
 	"time"
 
-	"github.com/wertual08/go-warp"
 	"github.com/wertual08/go-warp/storage"
 )
 
-type Queue struct {
+type queue struct {
     id             int32
-    options        *warp.QueueOptions
-    handlerFactory func() Handler
-    handlers       []Handler
+    options        *QueueOptions
+    handlerFactory func() handler
+    handlers       []handler
 }
 
-func NewQueue(
+func newQueue(
     queueId               int32,
-    options               *warp.QueueOptions,
-    handlerFactory func() Handler,
-) Queue {
-    return Queue{
+    options               *QueueOptions,
+    handlerFactory func() handler,
+) queue {
+    return queue{
         id: queueId,
         options: options,
         handlerFactory: handlerFactory,
     }
 }
 
-func (inst *Queue) Handle(
+func (inst *queue) handle(
     stride              int32,
     offset              int32,
     objectiveRepository storage.ObjectiveRepository,
     ctx                 context.Context,
 ) error {
-    if !inst.options.Enabled {
-        time.Sleep(inst.options.BatchDelay)
-        return nil
-    }
-
     now := time.Now()
     sectionsCount := (inst.options.SectionsCount + inst.options.SectionsOffset + stride - 1 - offset) / stride
 
@@ -79,7 +73,7 @@ func (inst *Queue) Handle(
 
 func handleSection(
     result              chan error, 
-    handler             Handler,
+    handler             handler,
     queueId             int32,
     section             int32,
     limit               int32,
@@ -100,13 +94,13 @@ func handleSection(
         return
     }
     
-    handler.Handle(objectives, ctx)
+    handler.handle(objectives, ctx)
 
-    if handler.Succeded() == int(limit) {
+    if handler.succeded() == int(limit) {
         *skipDelay = true
     }
 
-    if err := objectiveRepository.Create(handler.Failed(), ctx); err != nil {
+    if err := objectiveRepository.Create(handler.failed(), ctx); err != nil {
         result <- err
         return
     }

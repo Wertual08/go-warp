@@ -1,4 +1,4 @@
-package controller
+package warp
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"github.com/wertual08/go-warp/storage"
 )
 
-type Dispatcher struct {
+type dispatcher struct {
     id uuid.UUID
     dispatcherRepository storage.DispatcherRepository
 
@@ -24,11 +24,11 @@ type Dispatcher struct {
     queuesCallback func (*atomic.Int32, *sync.WaitGroup, int32, int32)
 }
 
-func NewDispatcher(
+func newDispatcher(
     dispatcherRepository storage.DispatcherRepository,
     queuesCallback func (*atomic.Int32, *sync.WaitGroup, int32, int32),
-) Dispatcher {
-    return Dispatcher{
+) dispatcher {
+    return dispatcher{
         id: uuid.New(),
         dispatcherRepository: dispatcherRepository,
         stride: -1,
@@ -37,19 +37,16 @@ func NewDispatcher(
     }
 }
 
-func (inst *Dispatcher) Process(
+func (inst *dispatcher) process(
     lifetime time.Duration,
     ctx context.Context,
-) error {
-    // TODO: Unsubscribe if disabled
-
+) (bool, error) {
     requiredStride, requiredOffset, err := inst.findRequred(ctx)
     if err != nil {
-        return err
+        return false, err
     }
 
     if requiredStride != inst.stride || requiredOffset != inst.offset {
-    
         if inst.queuesRunning.Load() != 0 {
             // TODO: Maybe i should update lifetime while waiting...
             inst.queuesRunning.Store(0)
@@ -61,12 +58,12 @@ func (inst *Dispatcher) Process(
     }
 
     if err := inst.upsert(lifetime, ctx); err != nil {
-        return err
+        return false, err
     }
 
     allValid, err := inst.checkValid(ctx)
     if err != nil {
-        return err
+        return false, err
     }
 
     if allValid && inst.queuesRunning.Load() == 0 {
@@ -79,10 +76,10 @@ func (inst *Dispatcher) Process(
         )
     }
 
-    return nil
+    return allValid, nil
 }
 
-func (inst *Dispatcher) Finish(ctx context.Context) error {
+func (inst *dispatcher) finish(ctx context.Context) error {
     if inst.queuesRunning.Load() != 0 {
         inst.queuesRunning.Store(0)
         inst.queuesWaitGroup.Wait()
@@ -91,7 +88,7 @@ func (inst *Dispatcher) Finish(ctx context.Context) error {
     return inst.dispatcherRepository.Remove(inst.id, ctx)
 }
 
-func (inst *Dispatcher) findRequred(ctx context.Context) (int32, int32, error) {
+func (inst *dispatcher) findRequred(ctx context.Context) (int32, int32, error) {
     dispatchers, err := inst.dispatcherRepository.List(ctx)
     if err != nil {
         return 0, 0, err
@@ -109,7 +106,7 @@ func (inst *Dispatcher) findRequred(ctx context.Context) (int32, int32, error) {
     return stride, offset, nil
 }
 
-func (inst *Dispatcher) upsert(
+func (inst *dispatcher) upsert(
     lifetime time.Duration, 
     ctx context.Context,
 ) error {
@@ -122,8 +119,7 @@ func (inst *Dispatcher) upsert(
     return inst.dispatcherRepository.Upsert(dto, lifetime, ctx)
 }
 
-// TODO: Unite in one step with findRequired
-func (inst *Dispatcher) checkValid(ctx context.Context) (bool, error) {
+func (inst *dispatcher) checkValid(ctx context.Context) (bool, error) {
     dispatchers, err := inst.dispatcherRepository.List(ctx)
     if err != nil {
         return false, err
